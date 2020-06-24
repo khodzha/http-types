@@ -14,7 +14,24 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// The error type for HTTP operations.
 pub struct Error {
     error: anyhow::Error,
-    status: crate::StatusCode,
+    status: ErroneousStatus,
+}
+#[derive(Debug)]
+pub enum ErroneousStatus {
+    Status(StatusCode),
+    InvalidStatus(u16),
+}
+
+impl From<StatusCode> for ErroneousStatus {
+    fn from(status: StatusCode) -> Self {
+        ErroneousStatus::Status(status)
+    }
+}
+
+impl From<u16> for ErroneousStatus {
+    fn from(status: u16) -> Self {
+        ErroneousStatus::InvalidStatus(status)
+    }
 }
 
 impl Error {
@@ -23,12 +40,13 @@ impl Error {
     /// The error type must be threadsafe and 'static, so that the Error will be
     /// as well. If the error type does not provide a backtrace, a backtrace will
     /// be created here to ensure that a backtrace exists.
-    pub fn new<E>(status: StatusCode, error: E) -> Self
+    pub fn new<S, E>(status: S, error: E) -> Self
     where
+        S: Into<ErroneousStatus>,
         E: StdError + Send + Sync + 'static,
     {
         Self {
-            status,
+            status: status.into(),
             error: anyhow::Error::new(error),
         }
     }
@@ -39,7 +57,7 @@ impl Error {
         M: Display + Debug + Send + Sync + 'static,
     {
         Self {
-            status,
+            status: ErroneousStatus::Status(status),
             error: anyhow::Error::msg(msg),
         }
     }
@@ -54,12 +72,15 @@ impl Error {
 
     /// Get the status code associated with this error.
     pub fn status(&self) -> StatusCode {
-        self.status
+        match self.status {
+            ErroneousStatus::Status(s) => s,
+            ErroneousStatus::InvalidStatus(_) => StatusCode::InternalServerError,
+        }
     }
 
     /// Set the status code associated with this error.
-    pub fn set_status(&mut self, status: StatusCode) {
-        self.status = status;
+    pub fn set_status<S: Into<ErroneousStatus>>(&mut self, status: S) {
+        self.status = status.into();
     }
 
     /// Get the backtrace for this Error.
@@ -126,7 +147,7 @@ where
     fn from(error: E) -> Self {
         Self {
             error: anyhow::Error::new(error),
-            status: StatusCode::InternalServerError,
+            status: ErroneousStatus::Status(StatusCode::InternalServerError),
         }
     }
 }
@@ -137,14 +158,14 @@ impl AsRef<dyn StdError + Send + Sync> for Error {
     }
 }
 
-impl AsRef<StatusCode> for Error {
-    fn as_ref(&self) -> &StatusCode {
+impl AsRef<ErroneousStatus> for Error {
+    fn as_ref(&self) -> &ErroneousStatus {
         &self.status
     }
 }
 
-impl AsMut<StatusCode> for Error {
-    fn as_mut(&mut self) -> &mut StatusCode {
+impl AsMut<ErroneousStatus> for Error {
+    fn as_mut(&mut self) -> &mut ErroneousStatus {
         &mut self.status
     }
 }

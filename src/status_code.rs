@@ -598,7 +598,7 @@ impl std::convert::TryFrom<u16> for StatusCode {
             508 => Ok(StatusCode::LoopDetected),
             510 => Ok(StatusCode::NotExtended),
             511 => Ok(StatusCode::NetworkAuthenticationRequired),
-            _ => crate::bail!("Invalid status code"),
+            code => crate::bail!("Invalid status code {}", code),
         }
     }
 }

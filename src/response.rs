@@ -147,6 +147,68 @@ impl Response {
         }
     }
 
+    /// Try creating a new response.
+    #[cfg(not(feature = "unstable"))]
+    pub fn try_new<S>(status: S) -> crate::Result<Self>
+    where
+        S: TryInto<StatusCode, Error = crate::Error>,
+        S::Error: Debug,
+    {
+        let status = match status.try_into() {
+            Ok(status) => status,
+            Err(e) => {
+                return Err(e);
+            }
+        };
+        let (trailers_sender, trailers_receiver) = sync::channel(1);
+        Ok(Self {
+            status,
+            headers: Headers::new(),
+            version: None,
+            body: Body::empty(),
+            trailers_sender: Some(trailers_sender),
+            trailers_receiver: Some(trailers_receiver),
+            has_trailers: false,
+            ext: Extensions::new(),
+            peer_addr: None,
+            local_addr: None,
+            error: None,
+        })
+    }
+
+    /// Try creating a new response.
+    #[cfg(feature = "unstable")]
+    pub fn try_new<S>(status: S) -> crate::Result<Self>
+    where
+        S: TryInto<StatusCode, Error = crate::Error>,
+        S::Error: Debug,
+    {
+        let status = match status.try_into() {
+            Ok(status) => status,
+            Err(e) => {
+                return Err(e);
+            }
+        };
+        let (trailers_sender, trailers_receiver) = sync::channel(1);
+        let (upgrade_sender, upgrade_receiver) = sync::channel(1);
+        Ok(Self {
+            status,
+            headers: Headers::new(),
+            version: None,
+            body: Body::empty(),
+            trailers_sender: Some(trailers_sender),
+            trailers_receiver: Some(trailers_receiver),
+            has_trailers: false,
+            upgrade_sender: Some(upgrade_sender),
+            upgrade_receiver: Some(upgrade_receiver),
+            has_upgrade: false,
+            ext: Extensions::new(),
+            peer_addr: None,
+            local_addr: None,
+            error: None,
+        })
+    }
+
     /// Get the status
     pub fn status(&self) -> StatusCode {
         self.status

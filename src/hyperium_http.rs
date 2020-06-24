@@ -17,9 +17,11 @@ impl From<Method> for http::Method {
     }
 }
 
-impl From<http::StatusCode> for StatusCode {
-    fn from(status: http::StatusCode) -> Self {
-        StatusCode::try_from(status.as_u16()).unwrap()
+impl TryFrom<http::StatusCode> for StatusCode {
+    type Error = crate::Error;
+
+    fn try_from(status: http::StatusCode) -> Result<Self, Self::Error> {
+        StatusCode::try_from(status.as_u16())
     }
 }
 
@@ -117,14 +119,16 @@ impl From<Request> for http::Request<Body> {
     }
 }
 
-impl From<http::Response<Body>> for Response {
-    fn from(res: http::Response<Body>) -> Self {
+impl TryFrom<http::Response<Body>> for Response {
+    type Error = crate::Error;
+
+    fn try_from(res: http::Response<Body>) -> Result<Self, Self::Error> {
         let (parts, body) = res.into_parts();
-        let mut res = Response::new(parts.status);
+        let mut res = Response::try_new(parts.status)?;
         res.set_body(body);
         res.set_version(Some(parts.version.into()));
         hyperium_headers_to_headers(parts.headers, res.as_mut());
-        res
+        Ok(res)
     }
 }
 
